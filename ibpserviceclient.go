@@ -32,15 +32,37 @@ func Initialize(configFilePath string, isNewAdmin bool) (bool, *sdkClient.Fabric
 }
 
 //EnrollOrgUser a new user in the system
-func EnrollOrgUser(configFilePath, userID, org string) bool {
-	return false
+func EnrollOrgUser(configFilePath, userID, secret, org string) bool {
+	isSucess, client := Initialize(configFilePath, false)
+	if !isSucess {
+		return false
+	}
+	return client.EnrollOrgUser(userID, secret, org)
+
 }
 
 //InstallAdminCerts Will install admin cert in IBP after checking
 //if that is not alreadt installed. Also restart the peers
 //and sync channels
-func InstallAdminCerts(ibpCredentialPath, specFile string) bool {
-	return false
+func InstallAdminCerts(ibpCredentialPath string, specMap map[string]interface{}) bool {
+	ibpConfig, err := ioutil.ReadFile(ibpCredentialPath)
+	if err != nil {
+		fmt.Printf("\n Error in reading network config %+v\n", err)
+		return false
+	}
+	ibpClient := sdkClient.NewIBPClient(ibpConfig)
+	mspID := getString(specMap["orgMSP"])
+	certName := getString(specMap["adminCertName"])
+	peerID := getString(specMap["peerID"])
+	certPath := getString(specMap["certFilePath"])
+	keyPath := getString(specMap["keyFilePath"])
+	channel := getString(specMap["channel"])
+	ibpClient.AddAdminCerts(mspID, certName, peerID, certPath)
+	ibpClient.StopPeer(peerID)
+	ibpClient.StartPeer(peerID)
+	ibpClient.SyncChannel(channel)
+	ibpClient.GenerateCertKeyEntry(certPath, keyPath)
+	return true
 }
 
 //DeployeCC install chanin code
@@ -133,7 +155,9 @@ func GenerateSpecFile(spec string) bool {
 			"peerID":"peer1-org1",
 			"certFilePath":"",
 			"keyFilePath":"",,
-			"adminCertName":"<unique-cert-name>"
+			"adminCertName":"<unique-cert-name>",
+			"orgMSP":"",
+			"channel":""
 
 		}
 		`
@@ -248,6 +272,14 @@ func main() {
 	switch command {
 	case "init":
 		isSuccess, _ = Initialize(configFile, true)
+	case "enroll":
+		if len(args) == 4 {
+			isSuccess = EnrollOrgUser(configFile, args[1], args[2], args[3])
+		} else {
+			fmt.Println("Invalid number of args")
+			fmt.Println("--config=<config file path> enroll <userid> <secret> <org> ")
+			isSuccess = false
+		}
 	case "cc-deploy":
 		isSuccess = DeployeCC(configFile, specMap)
 	case "cc-instantiate":
@@ -260,7 +292,7 @@ func main() {
 	case "cc-invoke":
 		isSuccess = InvokeChainCode(configFile, specMap)
 	case "add-admin-cert":
-		isSuccess = InstallAdminCerts(configFile, specFile)
+		isSuccess = InstallAdminCerts(configFile, specMap)
 	case "spec-gen":
 		if len(args) > 1 {
 			isSuccess = GenerateSpecFile(args[1])
@@ -293,9 +325,9 @@ func usage() {
 	fmt.Println("\t invoke a chain code query")
 	fmt.Println("--config=<config file path> --spec=<spec file path> cc-invoke ")
 	fmt.Println("\t performs a transaction ")
-	fmt.Println("add-admin-cert")
-	fmt.Println("\t add a new admin cert in IBP organization <Not implemented>")
-	fmt.Println("spec-gen <command>")
+	fmt.Println("--config=<rest api connection file path> --spec=<spec file path> add-admin-cert")
+	fmt.Println("\t add a new admin cert in IBP organization")
+	fmt.Println("--config=<rest api connection file path> spec-gen <command>")
 	fmt.Println("\t generate the specification json")
 
 }

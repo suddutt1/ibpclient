@@ -166,14 +166,26 @@ func GenerateSpecFile(spec string) bool {
 	case "cc-query":
 		specCCQuery := `
 		{
-
+			"descrption":"Chain code query",
+			"channel":"<channel name>",
+			"ccID":"<ccID>",
+			"peers":["",""],
+			"ccFunc":"<cc function to invoke>",
+			"params":["",""],
+			"userID":"<userID>"
 		}
 		`
 		fmt.Println("Chain code query spec\n", specCCQuery)
 	case "cc-invoke":
 		specCCInvoke := `
 		{
-
+			"descrption":"Chain code invoke",
+			"channel":"<channel name>",
+			"ccID":"<ccID>",
+			"peers":["",""],
+			"ccFunc":"<cc function to invoke>",
+			"params":["",""],
+			"userID":"<userID>"
 		}
 		`
 		fmt.Println("Chain code invoke spec\n", specCCInvoke)

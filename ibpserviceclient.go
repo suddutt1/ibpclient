@@ -130,23 +130,24 @@ func InvokeChainCode(configFilePath string, specMap map[string]interface{}) bool
 
 //GenerateSpecFile prints the spec file for varios activities
 func GenerateSpecFile(spec string) bool {
-	switch spec {
-	case "cc-deploy":
-	case "cc-instantiate":
-	case "cc-upgrade":
-
-		specInstallUpgrade := `
+	specInstallUpgrade := `
 		{
 			"description":"Install/Upgrade Chain Code",
 			"ccID":"<ccID>",
 			"version":"<ccVersion>",
-			"channel":"<channelName",
+			"channel":"<channelName>",
 			"goPath":"",
 			"ccSrcRootPath":"",
 			"initParams":["param1","param2"],
 			"ccPolicy":"<cc policy>"
 		}
 		`
+	switch spec {
+	case "cc-deploy":
+		fmt.Println("Chain code install/upgrade spec \n", specInstallUpgrade)
+	case "cc-instantiate":
+		fmt.Println("Chain code install/upgrade spec \n", specInstallUpgrade)
+	case "cc-upgrade":
 		fmt.Println("Chain code install/upgrade spec \n", specInstallUpgrade)
 	case "add-admin-cert":
 		specAdminCert := `
@@ -234,10 +235,16 @@ func isSpecRequired(command string) bool {
 	isRequired := false
 	switch command {
 	case "cc-deploy":
+		isRequired = true
 	case "cc-instantiate":
+		isRequired = true
 	case "cc-upgrade":
+		isRequired = true
 	case "cc-query":
+		isRequired = true
 	case "cc-invoke":
+		isRequired = true
+	case "add-admin-cert":
 		isRequired = true
 	}
 	return isRequired
@@ -327,6 +334,9 @@ func usage() {
 	fmt.Println("\t performs a transaction ")
 	fmt.Println("--config=<rest api connection file path> --spec=<spec file path> add-admin-cert")
 	fmt.Println("\t add a new admin cert in IBP organization")
+	fmt.Println("--config=<config file path> enroll <userid> <secret> <org>")
+	fmt.Println("\t enroll a user to an organization")
+
 	fmt.Println("--config=<rest api connection file path> spec-gen <command>")
 	fmt.Println("\t generate the specification json")
 

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strconv"
+	"strings"
 
 	sdkClient "github.com/suddutt1/fabricgosdkclientcore"
 )
@@ -27,7 +29,7 @@ func Initialize(configFilePath string, isNewAdmin bool) (bool, *sdkClient.Fabric
 		return false, nil
 	}
 	fmt.Println("Client initialization success")
-	return client.ErollOrgAdmin(isNewAdmin, "admin"), client
+	return client.EnrollOrgAdmin(isNewAdmin, "admin"), client
 
 }
 
@@ -72,9 +74,11 @@ func DeployeCC(configFilePath string, specMap map[string]interface{}) bool {
 		return false
 	}
 	ccID := getString(specMap["ccID"])
-	version := getString(specMap["version"])
+	channel := getString(specMap["channel"])
+	version := determineCCVersion(getString(specMap["version"]), channel, ccID, client)
 	goPath := getString(specMap["goPath"])
 	ccPath := getString(specMap["ccSrcRootPath"])
+	fmt.Println("Deploying cc version " + version)
 	return client.InstallChainCode(ccID, version, goPath, ccPath, nil)
 
 }
@@ -85,18 +89,54 @@ func InstantiateChainCode(configFilePath string, specMap map[string]interface{})
 	if !isSucess {
 		return false
 	}
-	ccID := getString(specMap["ccID"])
-	version := getString(specMap["version"])
-	ccPath := getString(specMap["ccSrcRootPath"])
 	channel := getString(specMap["channel"])
+	ccID := getString(specMap["ccID"])
+	version := determineCCVersion(getString(specMap["version"]), channel, ccID, client)
+	ccPath := getString(specMap["ccSrcRootPath"])
 	policy := getString(specMap["ccPolicy"])
 	initParams := getByteSlice(specMap["initParams"])
+	fmt.Println("Instantiating to version " + version)
 	isSucess, err := client.InstantiateCC(channel, ccID, ccPath, version, initParams, policy, nil)
 	if err != nil {
 		fmt.Println("Instantiation failure")
 		return false
 	}
 	return isSucess
+
+}
+
+func determineCCVersion(currentVersion, channel, ccID string, fabclient *sdkClient.FabricSDKClient) string {
+	if strings.EqualFold("AUTO", currentVersion) {
+		version := fabclient.GetChainCodeVersion(channel, ccID)
+		if version == nil {
+			return "1.0" // No version available so start with 1
+		}
+		verNumber, err := strconv.ParseFloat(*version, 32)
+		if err != nil {
+			return fmt.Sprintf("%s_%s", currentVersion, "1")
+		}
+		verNumber = verNumber + 1
+		return fmt.Sprintf("%.1f", verNumber)
+	}
+	return currentVersion
+
+}
+
+//GetChainCodeVersion rerives chain code version
+func GetChainCodeVersion(configFilePath string, specMap map[string]interface{}) bool {
+	isSucess, client := Initialize(configFilePath, false)
+	if !isSucess {
+		return false
+	}
+	ccID := getString(specMap["ccID"])
+	channel := getString(specMap["channel"])
+	version := client.GetChainCodeVersion(channel, ccID)
+	if version == nil {
+		fmt.Println("Unable to get version")
+		return false
+	}
+	fmt.Println("Chaincode version ", *version)
+	return true
 
 }
 
@@ -107,11 +147,12 @@ func UpgradeChainCode(configFilePath string, specMap map[string]interface{}) boo
 		return false
 	}
 	ccID := getString(specMap["ccID"])
-	version := getString(specMap["version"])
-	ccPath := getString(specMap["ccSrcRootPath"])
 	channel := getString(specMap["channel"])
+	version := determineCCVersion(getString(specMap["version"]), channel, ccID, client)
+	ccPath := getString(specMap["ccSrcRootPath"])
 	policy := getString(specMap["ccPolicy"])
 	initParams := getByteSlice(specMap["initParams"])
+	fmt.Println("Upgrading to version " + version)
 	isSucess, err := client.UpdateCC(channel, ccID, ccPath, version, initParams, policy, nil)
 	if err != nil {
 		fmt.Println("Instantiation failure")
@@ -149,6 +190,8 @@ func GenerateSpecFile(spec string) bool {
 		fmt.Println("Chain code install/upgrade spec \n", specInstallUpgrade)
 	case "cc-upgrade":
 		fmt.Println("Chain code install/upgrade spec \n", specInstallUpgrade)
+	case "cc-version":
+		fmt.Println("Chain code version spec \n", specInstallUpgrade)
 	case "add-admin-cert":
 		specAdminCert := `
 		{
@@ -258,6 +301,8 @@ func isSpecRequired(command string) bool {
 		isRequired = true
 	case "add-admin-cert":
 		isRequired = true
+	case "cc-version":
+		isRequired = true
 	}
 	return isRequired
 }
@@ -305,7 +350,8 @@ func main() {
 		isSuccess = InstantiateChainCode(configFile, specMap)
 	case "cc-upgrade":
 		isSuccess = UpgradeChainCode(configFile, specMap)
-
+	case "cc-version":
+		isSuccess = GetChainCodeVersion(configFile, specMap)
 	case "cc-query":
 		isSuccess = QueryChaninCode(configFile, specMap)
 	case "cc-invoke":
@@ -340,6 +386,8 @@ func usage() {
 	fmt.Println("\t instantiates the chain code")
 	fmt.Println("--config=<config file path> --spec=<spec file path> cc-upgrade ")
 	fmt.Println("\t upgrade the chain code")
+	fmt.Println("--config=<config file path> --spec=<spec file path> cc-version ")
+	fmt.Println("\t fetches chain code version")
 	fmt.Println("--config=<config file path> --spec=<spec file path> cc-query ")
 	fmt.Println("\t invoke a chain code query")
 	fmt.Println("--config=<config file path> --spec=<spec file path> cc-invoke ")

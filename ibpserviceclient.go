@@ -155,6 +155,37 @@ func UpgradeChainCode(configFilePath string, specMap map[string]interface{}) boo
 	fmt.Println("Upgrading to version " + version)
 	isSucess, err := client.UpdateCC(channel, ccID, ccPath, version, initParams, policy, nil)
 	if err != nil {
+		fmt.Println("Upgrade failure")
+		return false
+	}
+	return isSucess
+}
+
+//AutoInstantiateUpdate automatically determines to install or upgrade
+func AutoInstantiateUpdate(configFilePath string, specMap map[string]interface{}) bool {
+	isSucess, client := Initialize(configFilePath, false)
+	if !isSucess {
+		return false
+	}
+	ccID := getString(specMap["ccID"])
+	channel := getString(specMap["channel"])
+	version := determineCCVersion("AUTO", channel, ccID, client)
+	ccPath := getString(specMap["ccSrcRootPath"])
+	policy := getString(specMap["ccPolicy"])
+	initParams := getByteSlice(specMap["initParams"])
+	isFound, ccStatus, _ := client.GetChainCodeState(channel, ccID)
+	if isFound && strings.EqualFold(ccStatus, "INSTANTIATED") {
+		fmt.Println("Upgrading to version " + version)
+		isSucess, err := client.UpdateCC(channel, ccID, ccPath, version, initParams, policy, nil)
+		if err != nil {
+			fmt.Println("Upgrade failure")
+			return false
+		}
+		return isSucess
+	}
+	fmt.Println("Instantiating to version " + version)
+	isSucess, err := client.InstantiateCC(channel, ccID, ccPath, version, initParams, policy, nil)
+	if err != nil {
 		fmt.Println("Instantiation failure")
 		return false
 	}
@@ -303,6 +334,8 @@ func isSpecRequired(command string) bool {
 		isRequired = true
 	case "cc-version":
 		isRequired = true
+	case "cc-auto-update":
+		isRequired = true
 	}
 	return isRequired
 }
@@ -350,6 +383,8 @@ func main() {
 		isSuccess = InstantiateChainCode(configFile, specMap)
 	case "cc-upgrade":
 		isSuccess = UpgradeChainCode(configFile, specMap)
+	case "cc-auto-update":
+		isSuccess = AutoInstantiateUpdate(configFile, specMap)
 	case "cc-version":
 		isSuccess = GetChainCodeVersion(configFile, specMap)
 	case "cc-query":
@@ -386,6 +421,8 @@ func usage() {
 	fmt.Println("\t instantiates the chain code")
 	fmt.Println("--config=<config file path> --spec=<spec file path> cc-upgrade ")
 	fmt.Println("\t upgrade the chain code")
+	fmt.Println("--config=<config file path> --spec=<spec file path> cc-auto-update ")
+	fmt.Println("\t instantiate/upgrade the chain code after checking")
 	fmt.Println("--config=<config file path> --spec=<spec file path> cc-version ")
 	fmt.Println("\t fetches chain code version")
 	fmt.Println("--config=<config file path> --spec=<spec file path> cc-query ")
